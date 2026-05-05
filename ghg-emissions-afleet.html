@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>GHG Emissions AFLEET v1.0</title>
+    <title>GHG Emissions AFLEET v1.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="ghg-emissions-afleet.css" />
+    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=1.1" />
   </head>
   <body>
     <div style="max-width: 1280px; margin: 0 auto">
@@ -567,34 +567,58 @@
             min-width: 330px;
           "
         >
-          <h2 style="margin: 0 0 10px 0; font-size: 18px">
-            AFLEET/GREET Factors
-          </h2>
           <div
             style="
-              font-size: 12px;
-              color: #6b7280;
-              line-height: 1.4;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
               margin-bottom: 8px;
             "
           >
-            Edit kg CO2e/mi, kg CO2e/fuel unit, and idle fuel units/hr.
+            <h2 style="margin: 0; font-size: 18px">AFLEET/GREET Factors</h2>
+            <button
+              id="factorToggleBtn"
+              style="
+                background: #2563eb;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 6px 10px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: bold;
+              "
+            >
+              Show
+            </button>
           </div>
-          <div id="factorTable">Loading...</div>
-          <button
-            id="resetFactorsBtn"
-            style="
-              margin-top: 10px;
-              background: #6b7280;
-              color: white;
-              border: none;
-              border-radius: 8px;
-              padding: 8px 10px;
-              cursor: pointer;
-            "
-          >
-            Reset Factors
-          </button>
+          <div id="factorPanelContent" style="display: none">
+            <div
+              style="
+                font-size: 12px;
+                color: #6b7280;
+                line-height: 1.4;
+                margin-bottom: 8px;
+              "
+            >
+              Edit kg CO2e/mi, kg CO2e/fuel unit, and idle fuel units/hr.
+            </div>
+            <div id="factorTable">Loading...</div>
+            <button
+              id="resetFactorsBtn"
+              style="
+                margin-top: 10px;
+                background: #6b7280;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 10px;
+                cursor: pointer;
+              "
+            >
+              Reset Factors
+            </button>
+          </div>
         </div>
       </div>
       <div
@@ -677,6 +701,6 @@
         "
       ></pre>
     </div>
-    <script src="ghg-emissions-afleet.js"></script>
+    <script src="ghg-emissions-afleet.js?v=1.1"></script>
   </body>
 </html>

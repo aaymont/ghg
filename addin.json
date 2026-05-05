@@ -1,13 +1,13 @@
 {
-  "name": "GHG Emissions AFLEET v1.0",
+  "name": "GHG Emissions AFLEET v1.1",
   "supportEmail": "success@gofleet.com",
-  "version": "1.0",
+  "version": "1.1",
   "items": [
     {
-      "url": "ghg-emissions-afleet.html",
+      "url": "ghg-emissions-afleet.html?v=1.1",
       "path": "ActivityLink",
       "menuName": {
-        "en": "GHG Emissions AFLEET v1.0"
+        "en": "GHG Emissions AFLEET v1.1"
       }
     }
   ]

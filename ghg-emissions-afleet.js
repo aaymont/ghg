@@ -23,6 +23,7 @@ var _ignWindowCalls = 0;
 var _splitCount = 0;
 var _chart = null;
 var _runToken = 0;
+var _factorPanelExpanded = false;
 var FACTOR_KEY = "ghg_afleet_factors_v07";
 var OVERRIDE_KEY = "ghg_afleet_vehicle_fuels_v07";
 var fuelTypes = [
@@ -328,6 +329,23 @@ function renderFactors() {
     })(fuelTypes[i]);
   }
   wrap.appendChild(table);
+}
+function updateFactorPanelUi() {
+  var panel = document.getElementById("factorPanelContent");
+  var btn = document.getElementById("factorToggleBtn");
+  if (!panel || !btn) return;
+  panel.style.display = _factorPanelExpanded ? "block" : "none";
+  btn.textContent = _factorPanelExpanded ? "Hide" : "Show";
+}
+function initializeFactorPanelToggle() {
+  var btn = document.getElementById("factorToggleBtn");
+  if (!btn) return;
+  _factorPanelExpanded = false;
+  updateFactorPanelUi();
+  btn.onclick = function () {
+    _factorPanelExpanded = !_factorPanelExpanded;
+    updateFactorPanelUi();
+  };
 }
 function getDeviceMap() {
   var m = {};
@@ -1207,7 +1225,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.0";
+  var version = "1.1";
   var lines = [];
   lines.push(
     csvRow([
@@ -1279,7 +1297,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.0.csv";
+  a.download = "ghg-emissions-afleet-v1.1.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1288,6 +1306,7 @@ function downloadCsv() {
 geotab.addin["ghg-emissions-afleet-v012"] = function () {
   return {
     initialize: function (api, state, callback) {
+      initializeFactorPanelToggle();
       setDefaultDates();
       renderFactors();
       document.getElementById("runBtn").onclick = function () {
@@ -1317,4 +1336,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.0 registered");
+console.log("GHG Emissions AFLEET v1.1 registered");
