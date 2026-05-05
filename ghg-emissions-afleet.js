@@ -1207,7 +1207,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "0.12";
+  var version = "1.0";
   var lines = [];
   lines.push(
     csvRow([
@@ -1279,7 +1279,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v0.12.csv";
+  a.download = "ghg-emissions-afleet-v1.0.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1317,4 +1317,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v0.12 registered");
+console.log("GHG Emissions AFLEET v1.0 registered");
