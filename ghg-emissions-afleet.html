@@ -1,0 +1,682 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>GHG Emissions AFLEET v0.12</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="ghg-emissions-afleet.css" />
+  </head>
+  <body>
+    <div style="max-width: 1280px; margin: 0 auto">
+      <div
+        style="
+          background: #fff;
+          border-radius: 12px;
+          padding: 18px 20px;
+          margin-bottom: 16px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        "
+      >
+        <h1 style="margin: 0 0 8px 0; font-size: 26px; color: #111827">
+          Vehicle GHG Emissions by Powertrain and Fuel Type
+        </h1>
+        <div style="color: #4b5563; line-height: 1.5">
+          v0.10 calculates driving and idling GHG emissions by fuel type.
+          Ignition fallback checks are adaptive: grouped StatusData batches
+          retry smaller, time out safely, and continue so every idle candidate
+          is classified.
+        </div>
+      </div>
+      <div
+        style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px"
+      >
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 130px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >FROM DATE</label
+          ><input
+            id="fromDate"
+            type="date"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 130px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >TO DATE</label
+          ><input
+            id="toDate"
+            type="date"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 130px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >TRIP BATCH</label
+          ><select
+            id="windowDays"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+              background: white;
+            "
+          >
+            <option value="1">Daily</option>
+            <option value="3">3-day</option>
+            <option value="7">Weekly</option>
+          </select>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 130px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >UNITS</label
+          ><select
+            id="unitMode"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+              background: white;
+            "
+          >
+            <option value="us" selected>US</option>
+            <option value="metric">Metric</option>
+          </select>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 130px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >IDLE MIN</label
+          ><input
+            id="idleMin"
+            type="number"
+            value="3"
+            min="1"
+            step="1"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 130px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >MAX IDLE KM</label
+          ><input
+            id="idleKm"
+            type="number"
+            value="0.1"
+            min="0"
+            step="0.1"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 150px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >MAX IDLE HOURS</label
+          ><input
+            id="maxIdleHours"
+            type="number"
+            value="4"
+            min="0.1"
+            step="0.1"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 210px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >IGNITION DIAGNOSTIC</label
+          ><input
+            id="ignDiag"
+            type="text"
+            value="DiagnosticIgnitionId"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 220px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >ACTIONS</label
+          ><button
+            id="runBtn"
+            style="
+              background: #2563eb;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              padding: 10px 14px;
+              font-weight: bold;
+              cursor: pointer;
+              margin-right: 8px;
+            "
+          >
+            Calculate</button
+          ><button
+            id="csvBtn"
+            style="
+              background: #059669;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              padding: 10px 14px;
+              font-weight: bold;
+              cursor: pointer;
+            "
+          >
+            CSV
+          </button>
+        </div>
+      </div>
+      <div
+        id="status"
+        style="
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+          color: #1e40af;
+          border-radius: 10px;
+          padding: 12px;
+          margin-bottom: 16px;
+        "
+      >
+        Ready. Select a date range and click Calculate to run the emissions
+        report.
+      </div>
+      <div
+        style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px"
+      >
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 145px;
+          "
+        >
+          <div style="font-size: 12px; color: #6b7280; font-weight: bold">
+            TOTAL GHG
+          </div>
+          <div
+            id="totalGhg"
+            style="
+              font-size: 28px;
+              font-weight: bold;
+              color: #111827;
+              margin-top: 6px;
+            "
+          >
+            --
+          </div>
+          <div id="totalGhgLabel" style="font-size: 12px; color: #6b7280">
+            metric tonnes CO2e
+          </div>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 145px;
+          "
+        >
+          <div style="font-size: 12px; color: #6b7280; font-weight: bold">
+            DRIVING GHG
+          </div>
+          <div
+            id="driveGhg"
+            style="
+              font-size: 28px;
+              font-weight: bold;
+              color: #111827;
+              margin-top: 6px;
+            "
+          >
+            --
+          </div>
+          <div id="driveGhgLabel" style="font-size: 12px; color: #6b7280">
+            metric tonnes CO2e
+          </div>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 145px;
+          "
+        >
+          <div style="font-size: 12px; color: #6b7280; font-weight: bold">
+            IDLING GHG
+          </div>
+          <div
+            id="idleGhg"
+            style="
+              font-size: 28px;
+              font-weight: bold;
+              color: #111827;
+              margin-top: 6px;
+            "
+          >
+            --
+          </div>
+          <div id="idleGhgLabel" style="font-size: 12px; color: #6b7280">
+            metric tonnes CO2e
+          </div>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 145px;
+          "
+        >
+          <div style="font-size: 12px; color: #6b7280; font-weight: bold">
+            DRIVING HOURS
+          </div>
+          <div
+            id="drivingHours"
+            style="
+              font-size: 28px;
+              font-weight: bold;
+              color: #111827;
+              margin-top: 6px;
+            "
+          >
+            --
+          </div>
+          <div style="font-size: 12px; color: #6b7280">moving trip time</div>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 145px;
+          "
+        >
+          <div style="font-size: 12px; color: #6b7280; font-weight: bold">
+            IDLE HOURS
+          </div>
+          <div
+            id="idleHours"
+            style="
+              font-size: 28px;
+              font-weight: bold;
+              color: #111827;
+              margin-top: 6px;
+            "
+          >
+            --
+          </div>
+          <div id="idleSource" style="font-size: 12px; color: #6b7280">
+            source
+          </div>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 145px;
+          "
+        >
+          <div style="font-size: 12px; color: #6b7280; font-weight: bold">
+            IGNITION CHECKED
+          </div>
+          <div
+            id="ignChecks"
+            style="
+              font-size: 28px;
+              font-weight: bold;
+              color: #111827;
+              margin-top: 6px;
+            "
+          >
+            --
+          </div>
+          <div style="font-size: 12px; color: #6b7280">
+            checked / candidates
+          </div>
+        </div>
+      </div>
+      <div
+        style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px"
+      >
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 2;
+            min-width: 320px;
+          "
+        >
+          <h2 style="margin: 0 0 10px 0; font-size: 18px">
+            Total Emissions by Fuel Subtype
+          </h2>
+          <canvas
+            id="fuelChart"
+            style="width: 100%; max-height: 320px"
+          ></canvas>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 330px;
+          "
+        >
+          <h2 style="margin: 0 0 10px 0; font-size: 18px">
+            AFLEET/GREET Factors
+          </h2>
+          <div
+            style="
+              font-size: 12px;
+              color: #6b7280;
+              line-height: 1.4;
+              margin-bottom: 8px;
+            "
+          >
+            Edit kg CO2e/mi, kg CO2e/fuel unit, and idle fuel units/hr.
+          </div>
+          <div id="factorTable">Loading...</div>
+          <button
+            id="resetFactorsBtn"
+            style="
+              margin-top: 10px;
+              background: #6b7280;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              padding: 8px 10px;
+              cursor: pointer;
+            "
+          >
+            Reset Factors
+          </button>
+        </div>
+      </div>
+      <div
+        style="
+          background: #fff;
+          border-radius: 12px;
+          padding: 16px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        "
+      >
+        <h2 style="margin: 0 0 10px 0; font-size: 18px">Vehicles</h2>
+        <div
+          style="
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.4;
+            margin-bottom: 8px;
+          "
+        >
+          Fuel subtype is determined from Asset Information → Powertrain and
+          Fuel Type groups where available. Vehicle names open the asset page.
+        </div>
+        <div id="vehicleTable">Loading...</div>
+      </div>
+    </div>
+    <div
+      id="debug-toggle"
+      style="
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        z-index: 9999;
+      "
+    >
+      <button
+        onclick="
+          var d = document.getElementById('debug-log');
+          d.style.display = d.style.display === 'none' ? 'block' : 'none';
+        "
+        style="
+          background: #e74c3c;
+          color: #fff;
+          border: none;
+          padding: 4px 16px;
+          cursor: pointer;
+          font-size: 12px;
+          border-radius: 4px 4px 0 0;
+        "
+      >
+        Toggle Debug Log</button
+      ><button
+        onclick="copyDebugData()"
+        style="
+          background: #f39c12;
+          color: #fff;
+          border: none;
+          padding: 4px 16px;
+          cursor: pointer;
+          font-size: 12px;
+          border-radius: 4px 4px 0 0;
+          margin-left: 4px;
+        "
+      >
+        Copy Debug Data
+      </button>
+      <pre
+        id="debug-log"
+        style="
+          display: none;
+          background: #1e1e1e;
+          color: #0f0;
+          padding: 10px;
+          margin: 0;
+          max-height: 200px;
+          overflow-y: auto;
+          text-align: left;
+          font-size: 11px;
+        "
+      ></pre>
+    </div>
+    <script src="ghg-emissions-afleet.js"></script>
+  </body>
+</html>

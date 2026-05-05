@@ -1,0 +1,14 @@
+{
+  "name": "GHG Emissions AFLEET v0.12",
+  "supportEmail": "success@gofleet.com",
+  "version": "0.12",
+  "items": [
+    {
+      "url": "ghg-emissions-afleet.html",
+      "path": "ActivityLink",
+      "menuName": {
+        "en": "GHG Emissions AFLEET v0.12"
+      }
+    }
+  ]
+}
