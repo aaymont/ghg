@@ -1,0 +1,7 @@
+F1037 - Diesel being detected as gasoline?
+
+Company Group -> Asset Type
+Company Group -> Departments
+Asset Information -> Powertrain and Fuel Type -> sub-type
+
+Can we do a trend graph over time?

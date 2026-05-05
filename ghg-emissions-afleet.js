@@ -22,6 +22,7 @@ var _idleCalls = 0;
 var _ignWindowCalls = 0;
 var _splitCount = 0;
 var _chart = null;
+var _distanceChart = null;
 var _runToken = 0;
 var _factorPanelExpanded = false;
 var FACTOR_KEY = "ghg_afleet_factors_v07";
@@ -900,12 +901,14 @@ function renderSummary(src) {
     ik = 0,
     ih = 0,
     dh = 0,
+    totalMiles = 0,
     i;
   for (i = 0; i < _rows.length; i++) {
     dk += _rows[i].drivingKg;
     ik += _rows[i].idlingKg;
     ih += _rows[i].idleHours;
     dh += _rows[i].drivingHours || 0;
+    totalMiles += _rows[i].miles || 0;
   }
   document.getElementById("totalGhg").textContent = nfmt(
     displayGhgFromKg(dk + ik),
@@ -925,8 +928,11 @@ function renderSummary(src) {
   document.getElementById("idleHours").textContent = nfmt(ih, 1);
   document.getElementById("drivingHours").textContent = nfmt(dh, 1);
   document.getElementById("idleSource").textContent = src || "source";
-  document.getElementById("ignChecks").textContent =
-    nfmt(_ignChecked, 0) + " / " + nfmt(_candidateCount, 0);
+  document.getElementById("totalDistance").textContent = nfmt(
+    displayDistanceFromMiles(totalMiles),
+    1,
+  );
+  document.getElementById("totalDistanceLabel").textContent = distanceLabel();
 }
 function renderVehicleTable() {
   var wrap = document.getElementById("vehicleTable");
@@ -1014,29 +1020,51 @@ function renderVehicleTable() {
 }
 function renderChart() {
   var byFuel = {};
+  var milesByFuel = {};
   var i;
   for (i = 0; i < _rows.length; i++) {
     if (!byFuel[_rows[i].fuel]) byFuel[_rows[i].fuel] = 0;
+    if (!milesByFuel[_rows[i].fuel]) milesByFuel[_rows[i].fuel] = 0;
     byFuel[_rows[i].fuel] += displayGhgFromKg(_rows[i].totalKg);
+    milesByFuel[_rows[i].fuel] += displayDistanceFromMiles(_rows[i].miles || 0);
   }
   var labels = [];
-  var values = [];
+  var ghgValues = [];
+  var distanceValues = [];
   var keys = Object.keys(byFuel).sort(function (a, b) {
     return byFuel[b] - byFuel[a];
   });
   for (i = 0; i < keys.length; i++) {
     labels.push(keys[i]);
-    values.push(Math.round(byFuel[keys[i]] * 1000) / 1000);
+    ghgValues.push(Math.round(byFuel[keys[i]] * 1000) / 1000);
+    distanceValues.push(Math.round(milesByFuel[keys[i]] * 10) / 10);
   }
   var ctx = document.getElementById("fuelChart");
+  var distanceCtx = document.getElementById("distanceChart");
   if (_chart) _chart.destroy();
+  if (_distanceChart) _distanceChart.destroy();
   if (typeof Chart === "undefined") {
     debugLog("Chart.js not loaded");
     return;
   }
   _chart = new Chart(ctx, {
     type: "bar",
-    data: { labels: labels, datasets: [{ label: ghgLabel(), data: values }] },
+    data: {
+      labels: labels,
+      datasets: [{ label: ghgLabel(), data: ghgValues }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+  _distanceChart = new Chart(distanceCtx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{ label: distanceLabel(), data: distanceValues }],
+    },
     options: {
       responsive: true,
       plugins: { legend: { display: false } },
@@ -1225,7 +1253,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.1";
+  var version = "1.2";
   var lines = [];
   lines.push(
     csvRow([
@@ -1297,7 +1325,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.1.csv";
+  a.download = "ghg-emissions-afleet-v1.2.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1336,4 +1364,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.1 registered");
+console.log("GHG Emissions AFLEET v1.2 registered");

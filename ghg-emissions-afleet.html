@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>GHG Emissions AFLEET v1.1</title>
+    <title>GHG Emissions AFLEET v1.2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=1.1" />
+    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=1.2" />
   </head>
   <body>
     <div style="max-width: 1280px; margin: 0 auto">
@@ -518,10 +518,10 @@
           "
         >
           <div style="font-size: 12px; color: #6b7280; font-weight: bold">
-            IGNITION CHECKED
+            TOTAL DISTANCE
           </div>
           <div
-            id="ignChecks"
+            id="totalDistance"
             style="
               font-size: 28px;
               font-weight: bold;
@@ -531,8 +531,8 @@
           >
             --
           </div>
-          <div style="font-size: 12px; color: #6b7280">
-            checked / candidates
+          <div id="totalDistanceLabel" style="font-size: 12px; color: #6b7280">
+            mi
           </div>
         </div>
       </div>
@@ -554,6 +554,13 @@
           </h2>
           <canvas
             id="fuelChart"
+            style="width: 100%; max-height: 320px"
+          ></canvas>
+          <h2 style="margin: 20px 0 10px 0; font-size: 18px">
+            Distance by Fuel Subtype
+          </h2>
+          <canvas
+            id="distanceChart"
             style="width: 100%; max-height: 320px"
           ></canvas>
         </div>
@@ -701,6 +708,6 @@
         "
       ></pre>
     </div>
-    <script src="ghg-emissions-afleet.js?v=1.1"></script>
+    <script src="ghg-emissions-afleet.js?v=1.2"></script>
   </body>
 </html>
