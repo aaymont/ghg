@@ -211,19 +211,66 @@ function getGroupPathToRoot(groupId) {
   }
   return path;
 }
-function hasPowertrainFuelPath(pathNames) {
-  var assetIx = -1;
-  var powertrainIx = -1;
+function pathFromSlashSeparatedName(name) {
+  var raw = String(name || "");
+  if (raw.indexOf("/") === -1) return [];
+  var parts = raw.split("/");
+  var out = [];
+  var i;
+  for (i = 0; i < parts.length; i++) {
+    var part = String(parts[i] || "").trim();
+    if (part) out.push(part);
+  }
+  return out;
+}
+function mapFuelSubtypeName(name) {
+  var n = normalizeGroupLabel(name);
+  var explicit = {
+    "battery electric vehicle": "All-Electric EV",
+    "plug-in hybrid electric vehicle": "Gasoline PHEV",
+    "hybrid electric (hev)": "Gasoline HEV",
+    "low voltage electric": "All-Electric EV",
+    "fuel cell electric vehicle": "G.H2 FCV",
+    "gasoline or petrol": "Gasoline",
+    diesel: "Diesel",
+    biodiesel: "B100",
+    "compressed natural gas": "CNG",
+    ethanol: "E85",
+    "propane or liquified petroleum gas": "LPG",
+    "propane or liquefied petroleum gas": "LPG",
+    "electric or plug-in hybrid": null,
+    "manually classified powertrain": null,
+    "liquefied natural gas": "LNG",
+    "other fuel type": null,
+  };
+  if (explicit.hasOwnProperty(n)) return explicit[n];
+  return normFuel(name);
+}
+function fuelFromAssetInfoPath(pathNames) {
+  if (!pathNames || pathNames.length === 0) return null;
+  var normalized = [];
   var i;
   for (i = 0; i < pathNames.length; i++) {
-    if (assetIx === -1 && pathNames[i] === "asset information") assetIx = i;
+    normalized.push(normalizeGroupLabel(pathNames[i]));
+  }
+  var assetIx = -1;
+  var powertrainIx = -1;
+  for (i = 0; i < normalized.length; i++) {
+    if (assetIx === -1 && normalized[i] === "asset information") assetIx = i;
     if (
       powertrainIx === -1 &&
-      pathNames[i] === "powertrain and fuel type"
+      normalized[i] === "powertrain and fuel type" &&
+      assetIx > -1 &&
+      i > assetIx
     )
       powertrainIx = i;
   }
-  return assetIx > -1 && powertrainIx > assetIx;
+  if (powertrainIx === -1) return null;
+  for (i = pathNames.length - 1; i > powertrainIx; i--) {
+    var f = mapFuelSubtypeName(pathNames[i]);
+    if (f) return f;
+  }
+  return null;
 }
 function normFuel(text) {
   var s = String(text || "").toLowerCase();
@@ -260,42 +307,48 @@ function normFuel(text) {
 }
 function classifyFuel(device) {
   var overrides = getSavedJson(OVERRIDE_KEY, {});
-  if (overrides[device.id])
-    return { fuel: overrides[device.id], source: "Manual override" };
+  var manualOverride = overrides[device.id] || null;
   var groups = device.groups || [];
   var best = null;
   var src = "No fuel group found; defaulted to Gasoline";
   var i;
   for (i = 0; i < groups.length; i++) {
-    var id = groups[i].id || "";
+    var groupRef = groups[i] || {};
+    var id = groupRef.id || "";
+    var pathNames = [];
     var pathLeafToRoot = getGroupPathToRoot(id);
     var pathRootToLeaf = pathLeafToRoot.slice().reverse();
-    var pathNames = [];
     var j;
     for (j = 0; j < pathRootToLeaf.length; j++) {
       pathNames.push(pathRootToLeaf[j].name || pathRootToLeaf[j].id || "");
     }
-    var normalizedPathNames = [];
-    for (j = 0; j < pathNames.length; j++) {
-      normalizedPathNames.push(normalizeGroupLabel(pathNames[j]));
+    if (pathNames.length === 0) {
+      var inlinePath = pathFromSlashSeparatedName(groupRef.name || "");
+      if (inlinePath.length > 0) pathNames = inlinePath;
     }
-    var inPowertrainTree = hasPowertrainFuelPath(normalizedPathNames);
+    if (pathNames.length === 0 && (groupRef.name || id)) {
+      pathNames = [groupRef.name || groupName(id)];
+    }
+    var fuelFromPath = fuelFromAssetInfoPath(pathNames);
     var nm = groupName(id);
     var combined = id + " " + pathNames.join(" > ");
-    var f = normFuel(combined);
+    var f = fuelFromPath || normFuel(combined);
     if (f) {
       var score = 1;
-      if (inPowertrainTree) score = 100 + pathNames.length;
+      if (fuelFromPath) score = 1000 + pathNames.length;
       else if (id.indexOf("Group") === 0) score = 2;
       if (!best || score > best.score) {
         best = { fuel: f, score: score };
-        src = inPowertrainTree
-          ? pathNames.join(" > ")
-          : nm + " (" + id + ")";
+        src = fuelFromPath ? pathNames.join(" > ") : nm + " (" + id + ")";
       }
     }
   }
   if (best) return { fuel: best.fuel, source: src };
+  if (manualOverride)
+    return {
+      fuel: manualOverride,
+      source: "Manual override (used because no Asset Information fuel group matched)",
+    };
   return { fuel: "Gasoline", source: src };
 }
 function makeFuelSelect(deviceId, selected) {
