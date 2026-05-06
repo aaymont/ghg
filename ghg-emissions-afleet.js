@@ -23,6 +23,7 @@ var _ignWindowCalls = 0;
 var _splitCount = 0;
 var _chart = null;
 var _distanceChart = null;
+var _trendChart = null;
 var _runToken = 0;
 var _isProcessing = false;
 var _ignMultiCallCount = 0;
@@ -589,12 +590,16 @@ function addTrips(arr) {
       var km = t.distance || 0;
       var miles = km * 0.621371;
       var hrs = hoursBetween(t.start, t.stop);
+      var monthBucket = getMonthBucket(t.start || t.stop);
+      var weekBucket = getIsoWeekBucket(t.start || t.stop);
       if (!_tripAgg[id])
         _tripAgg[id] = { miles: 0, kilometers: 0, trips: 0, drivingHours: 0 };
       _tripAgg[id].miles += miles;
       _tripAgg[id].kilometers += km;
       _tripAgg[id].trips += 1;
       _tripCount += 1;
+      addTrendDeviceValue(_driveTrendByMonth, monthBucket, id, miles);
+      addTrendDeviceValue(_driveTrendByWeek, weekBucket, id, miles);
       if (km <= maxKm && hrs >= minHr) {
         if (hrs <= maxHr) {
           _idleCandidates.push({
@@ -620,10 +625,15 @@ function addRuleIdle(arr) {
     var ev = arr[i];
     if (ev.device && ev.device.id) {
       var id = ev.device.id;
+      var monthBucket = getMonthBucket(ev.activeFrom || ev.activeTo);
+      var weekBucket = getIsoWeekBucket(ev.activeFrom || ev.activeTo);
+      var idleHours = parseDurationHours(ev);
       if (!_ruleIdleAgg[id]) _ruleIdleAgg[id] = { hours: 0, events: 0 };
-      _ruleIdleAgg[id].hours += parseDurationHours(ev);
+      _ruleIdleAgg[id].hours += idleHours;
       _ruleIdleAgg[id].events += 1;
       _ruleIdleCount += 1;
+      addTrendDeviceValue(_ruleIdleTrendByMonth, monthBucket, id, idleHours);
+      addTrendDeviceValue(_ruleIdleTrendByWeek, weekBucket, id, idleHours);
     }
   }
 }
@@ -641,6 +651,18 @@ function addConfirmedIdle(c) {
     _tripIdleAgg[c.deviceId] = { hours: 0, events: 0 };
   _tripIdleAgg[c.deviceId].hours += c.hours;
   _tripIdleAgg[c.deviceId].events += 1;
+  addTrendDeviceValue(
+    _tripIdleTrendByMonth,
+    getMonthBucket(c.start || c.stop),
+    c.deviceId,
+    c.hours,
+  );
+  addTrendDeviceValue(
+    _tripIdleTrendByWeek,
+    getIsoWeekBucket(c.start || c.stop),
+    c.deviceId,
+    c.hours,
+  );
   _ignConfirmed += 1;
 }
 function groupKeyForCandidate(c) {
@@ -1300,6 +1322,14 @@ function loadData(api) {
   _tripAgg = {};
   _ruleIdleAgg = {};
   _tripIdleAgg = {};
+  _driveTrendByMonth = {};
+  _driveTrendByWeek = {};
+  _ruleIdleTrendByMonth = {};
+  _ruleIdleTrendByWeek = {};
+  _tripIdleTrendByMonth = {};
+  _tripIdleTrendByWeek = {};
+  _fuelInfoCache = {};
+  _trendGranularity = "month";
   _idleCandidates = [];
   _rows = [];
   _tripCount = 0;

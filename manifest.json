@@ -1,14 +1,15 @@
 {
   "name": "GHG Emissions",
   "supportEmail": "success@gofleet.com",
-  "version": "2.4",
+  "version": "2.5",
   "items": [
     {
-      "url": "https://aaymont.github.io/ghg/ghg-emissions-afleet.html?v=2.4",
+      "url": "https://aaymont.github.io/ghg/ghg-emissions-afleet.html?v=2.5",
       "path": "SustainabilityId/",
       "menuName": {
         "en": "GHG Emissions"
-      }
+      },
+      "icon": "https://aaymont.github.io/ghg/gf30px.svg?v=2.5"
     }
   ]
 }

@@ -202,8 +202,10 @@ function renderChart() {
   }
   var ctx = document.getElementById("fuelChart");
   var distanceCtx = document.getElementById("distanceChart");
+  var trendCtx = document.getElementById("trendChart");
   if (_chart) _chart.destroy();
   if (_distanceChart) _distanceChart.destroy();
+  if (_trendChart) _trendChart.destroy();
   if (typeof Chart === "undefined") {
     debugLog("Chart.js not loaded");
     return;
@@ -232,30 +234,199 @@ function renderChart() {
       scales: { y: { beginAtZero: true } },
     },
   });
+  _trendChart = renderTrendChart(trendCtx, _trendGranularity);
   setChartTab(_activeChartTab || "distance");
 }
 var _activeChartTab = "distance";
+var _trendGranularity = "month";
+var _driveTrendByMonth = {};
+var _driveTrendByWeek = {};
+var _ruleIdleTrendByMonth = {};
+var _ruleIdleTrendByWeek = {};
+var _tripIdleTrendByMonth = {};
+var _tripIdleTrendByWeek = {};
+var _fuelInfoCache = {};
+
+function getFuelInfo(deviceId) {
+  if (_fuelInfoCache[deviceId]) return _fuelInfoCache[deviceId];
+  var dm = getDeviceMap();
+  var dev = dm[deviceId] || { id: deviceId, name: deviceId, groups: [] };
+  var cls = classifyFuel(dev);
+  var ff = getFactors()[cls.fuel] || { mile: 0, idleUnit: 0, idleRate: 0 };
+  var info = {
+    fuel: cls.fuel,
+    source: cls.source,
+    mileFactor: ff.mile || 0,
+    idleUnitFactor: ff.idleUnit || 0,
+    idleRate: ff.idleRate || 0,
+  };
+  _fuelInfoCache[deviceId] = info;
+  return info;
+}
+
+function pad2(v) {
+  return v < 10 ? "0" + v : String(v);
+}
+
+function getMonthBucket(dateValue) {
+  var d = new Date(dateValue);
+  if (isNaN(d.getTime())) return null;
+  return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1);
+}
+
+function getIsoWeekBucket(dateValue) {
+  var d = new Date(dateValue);
+  if (isNaN(d.getTime())) return null;
+  var utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  utc.setUTCDate(utc.getUTCDate() + 4 - (utc.getUTCDay() || 7));
+  var yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  var weekNo = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7);
+  return utc.getUTCFullYear() + "-W" + pad2(weekNo);
+}
+
+function addTrendDeviceValue(map, bucket, deviceId, value) {
+  if (!bucket) return;
+  if (!deviceId) return;
+  if (!map[bucket]) map[bucket] = {};
+  if (!map[bucket][deviceId]) map[bucket][deviceId] = 0;
+  map[bucket][deviceId] += value || 0;
+}
+
+function sumDriveBucketKg(bucketMap) {
+  var ids = Object.keys(bucketMap || {});
+  var total = 0;
+  var i;
+  for (i = 0; i < ids.length; i++) {
+    var info = getFuelInfo(ids[i]);
+    total += (bucketMap[ids[i]] || 0) * (info.mileFactor || 0);
+  }
+  return total;
+}
+
+function sumIdleBucketKg(bucketMap) {
+  var ids = Object.keys(bucketMap || {});
+  var total = 0;
+  var i;
+  for (i = 0; i < ids.length; i++) {
+    var info = getFuelInfo(ids[i]);
+    total +=
+      (bucketMap[ids[i]] || 0) * (info.idleRate || 0) * (info.idleUnitFactor || 0);
+  }
+  return total;
+}
+
+function buildTrendSeries(granularity) {
+  var drive = granularity === "week" ? _driveTrendByWeek : _driveTrendByMonth;
+  var idleRule =
+    granularity === "week" ? _ruleIdleTrendByWeek : _ruleIdleTrendByMonth;
+  var idleTrip =
+    granularity === "week" ? _tripIdleTrendByWeek : _tripIdleTrendByMonth;
+  var idle = totalHours(_ruleIdleAgg) > 0 ? idleRule : idleTrip;
+  var merged = {};
+  var keys = Object.keys(drive);
+  var i;
+  for (i = 0; i < keys.length; i++) merged[keys[i]] = 0;
+  keys = Object.keys(idle);
+  for (i = 0; i < keys.length; i++) merged[keys[i]] = 0;
+  keys = Object.keys(merged).sort();
+  var labels = [];
+  var values = [];
+  for (i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var totalKg = sumDriveBucketKg(drive[k]) + sumIdleBucketKg(idle[k]);
+    labels.push(k);
+    values.push(Math.round(displayGhgFromKg(totalKg) * 1000) / 1000);
+  }
+  return { labels: labels, values: values };
+}
+
+function renderTrendChart(ctx, granularity) {
+  var series = buildTrendSeries(granularity || "month");
+  return new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: series.labels,
+      datasets: [
+        {
+          label: ghgLabel(),
+          data: series.values,
+          borderColor: "#2563eb",
+          backgroundColor: "rgba(37, 99, 235, 0.12)",
+          pointRadius: 3,
+          pointHoverRadius: 4,
+          tension: 0.25,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
+function updateTrendToggleUi() {
+  var monthBtn = document.getElementById("trendByMonthBtn");
+  var weekBtn = document.getElementById("trendByWeekBtn");
+  if (!monthBtn || !weekBtn) return;
+  var isMonth = _trendGranularity !== "week";
+  monthBtn.style.background = isMonth ? "#2563eb" : "transparent";
+  monthBtn.style.color = isMonth ? "white" : "#374151";
+  weekBtn.style.background = isMonth ? "transparent" : "#2563eb";
+  weekBtn.style.color = isMonth ? "#374151" : "white";
+}
+
+function setTrendGranularity(granularity) {
+  _trendGranularity = granularity === "week" ? "week" : "month";
+  updateTrendToggleUi();
+  if (_trendChart) _trendChart.destroy();
+  var trendCtx = document.getElementById("trendChart");
+  if (!trendCtx || typeof Chart === "undefined") return;
+  _trendChart = renderTrendChart(trendCtx, _trendGranularity);
+}
 
 function setChartTab(tabName) {
-  var tab = tabName === "emissions" ? "emissions" : "distance";
+  var tab = "distance";
+  if (tabName === "emissions") tab = "emissions";
+  if (tabName === "trend") tab = "trend";
   _activeChartTab = tab;
   var distancePanel = document.getElementById("distanceChartPanel");
   var fuelPanel = document.getElementById("fuelChartPanel");
+  var trendPanel = document.getElementById("trendChartPanel");
   var distanceBtn = document.getElementById("tabDistanceBtn");
   var emissionsBtn = document.getElementById("tabEmissionsBtn");
+  var trendBtn = document.getElementById("tabTrendBtn");
   var title = document.getElementById("chartTabTitle");
-  if (!distancePanel || !fuelPanel || !distanceBtn || !emissionsBtn || !title)
+  if (
+    !distancePanel ||
+    !fuelPanel ||
+    !trendPanel ||
+    !distanceBtn ||
+    !emissionsBtn ||
+    !trendBtn ||
+    !title
+  )
     return;
   var showDistance = tab === "distance";
+  var showEmissions = tab === "emissions";
+  var showTrend = tab === "trend";
   distancePanel.style.display = showDistance ? "block" : "none";
-  fuelPanel.style.display = showDistance ? "none" : "block";
+  fuelPanel.style.display = showEmissions ? "block" : "none";
+  trendPanel.style.display = showTrend ? "block" : "none";
   distanceBtn.style.background = showDistance ? "#2563eb" : "#e5e7eb";
   distanceBtn.style.color = showDistance ? "white" : "#374151";
-  emissionsBtn.style.background = showDistance ? "#e5e7eb" : "#2563eb";
-  emissionsBtn.style.color = showDistance ? "#374151" : "white";
+  emissionsBtn.style.background = showEmissions ? "#2563eb" : "#e5e7eb";
+  emissionsBtn.style.color = showEmissions ? "white" : "#374151";
+  trendBtn.style.background = showTrend ? "#2563eb" : "#e5e7eb";
+  trendBtn.style.color = showTrend ? "white" : "#374151";
   title.textContent = showDistance
     ? "Distance by Fuel Subtype"
-    : "Total Emissions by Fuel Subtype";
+    : showEmissions
+      ? "Total Emissions by Fuel Subtype"
+      : "GHG Emissions Trend Over Time";
+  updateTrendToggleUi();
 }
 
 function csvCell(value) {
@@ -278,7 +449,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "2.4";
+  var version = "2.5";
   var lines = [];
   lines.push(
     csvRow([
@@ -350,7 +521,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v2.4.csv";
+  a.download = "ghg-emissions-afleet-v2.5.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

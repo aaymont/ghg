@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>GHG Emissions AFLEET v2.4</title>
+    <title>GHG Emissions AFLEET v2.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=2.4" />
+    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=2.5" />
   </head>
   <body>
     <div style="max-width: 1280px; margin: 0 auto">
@@ -30,11 +30,11 @@
               Vehicle GHG Emissions by Powertrain and Fuel Type
             </h1>
             <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px">
-              Version 2.4
+              Version 2.5
             </div>
           </div>
           <img
-            src="../gf30px.png"
+            src="gf30px.svg?v=2.5"
             alt="GoFleet logo"
             style="height: 30px; width: auto; object-fit: contain; margin-top: 2px"
           />
@@ -624,6 +624,23 @@
               >
                 Emissions
               </button>
+              <button
+                id="tabTrendBtn"
+                type="button"
+                onclick="setChartTab('trend')"
+                style="
+                  background: #e5e7eb;
+                  color: #374151;
+                  border: none;
+                  border-radius: 8px;
+                  padding: 6px 10px;
+                  cursor: pointer;
+                  font-size: 12px;
+                  font-weight: bold;
+                "
+              >
+                Trend
+              </button>
             </div>
           </div>
           <div id="distanceChartPanel">
@@ -635,6 +652,58 @@
           <div id="fuelChartPanel" style="display: none">
             <canvas
               id="fuelChart"
+              style="width: 100%; max-height: 320px"
+            ></canvas>
+          </div>
+          <div id="trendChartPanel" style="display: none">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 8px">
+              <div
+                style="
+                  display: inline-flex;
+                  gap: 6px;
+                  background: #f3f4f6;
+                  border-radius: 8px;
+                  padding: 4px;
+                "
+              >
+                <button
+                  id="trendByMonthBtn"
+                  type="button"
+                  onclick="setTrendGranularity('month')"
+                  style="
+                    background: #2563eb;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 6px 10px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    font-weight: bold;
+                  "
+                >
+                  Month
+                </button>
+                <button
+                  id="trendByWeekBtn"
+                  type="button"
+                  onclick="setTrendGranularity('week')"
+                  style="
+                    background: transparent;
+                    color: #374151;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 6px 10px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    font-weight: bold;
+                  "
+                >
+                  Week
+                </button>
+              </div>
+            </div>
+            <canvas
+              id="trendChart"
               style="width: 100%; max-height: 320px"
             ></canvas>
           </div>
@@ -784,8 +853,8 @@
         "
       ></pre>
     </div>
-    <script src="ghg-emissions-afleet-render.js?v=2.4"></script>
-    <script src="ghg-emissions-afleet.js?v=2.4"></script>
-    <script src="ghg-emissions-afleet-bootstrap.js?v=2.4"></script>
+    <script src="ghg-emissions-afleet-render.js?v=2.5"></script>
+    <script src="ghg-emissions-afleet.js?v=2.5"></script>
+    <script src="ghg-emissions-afleet-bootstrap.js?v=2.5"></script>
   </body>
 </html>
