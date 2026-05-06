@@ -27,6 +27,9 @@ var _runToken = 0;
 var _factorPanelExpanded = false;
 var FACTOR_KEY = "ghg_afleet_factors_v07";
 var OVERRIDE_KEY = "ghg_afleet_vehicle_fuels_v07";
+var IGNITION_DIAGNOSTIC_ID = "DiagnosticIgnitionId";
+var FIXED_IGNITION_BATCH_SIZE = 50;
+var FIXED_WINDOW_BATCH_SIZE = 16;
 var fuelTypes = [
   "Gasoline",
   "Diesel",
@@ -601,10 +604,7 @@ function ignitionWindowReq(g) {
       typeName: "StatusData",
       search: {
         deviceSearch: { id: g.deviceId },
-        diagnosticSearch: {
-          id:
-            document.getElementById("ignDiag").value || "DiagnosticIgnitionId",
-        },
+        diagnosticSearch: { id: IGNITION_DIAGNOSTIC_ID },
         fromDate: g.from.toISOString(),
         toDate: g.to.toISOString(),
       },
@@ -1275,18 +1275,8 @@ function loadData(api) {
   var from = document.getElementById("fromDate").value;
   var to = document.getElementById("toDate").value;
   var days = parseInt(document.getElementById("windowDays").value, 10) || 1;
-  var tripIdleBatchSize = clampInt(
-    (document.getElementById("windowCallBatchSize") || {}).value,
-    16,
-    1,
-    50,
-  );
-  var ignitionBatchSize = clampInt(
-    (document.getElementById("ignitionCallBatchSize") || {}).value,
-    10,
-    1,
-    50,
-  );
+  var tripIdleBatchSize = FIXED_WINDOW_BATCH_SIZE;
+  var ignitionBatchSize = FIXED_IGNITION_BATCH_SIZE;
   if (!from || !to) {
     setStatus("Please select a from date and to date.", true);
     return;
@@ -1316,7 +1306,7 @@ function loadData(api) {
       idleMin: document.getElementById("idleMin").value,
       idleKm: document.getElementById("idleKm").value,
       maxIdleHours: document.getElementById("maxIdleHours").value,
-      ignitionDiagnosticId: document.getElementById("ignDiag").value,
+      ignitionDiagnosticId: IGNITION_DIAGNOSTIC_ID,
     },
     multicallSettings: {
       tripIdleBatchSize: tripIdleBatchSize,
@@ -1469,7 +1459,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.5";
+  var version = "1.6";
   var lines = [];
   lines.push(
     csvRow([
@@ -1541,7 +1531,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.5.csv";
+  a.download = "ghg-emissions-afleet-v1.6.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1580,4 +1570,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.5 registered");
+console.log("GHG Emissions AFLEET v1.6 registered");
