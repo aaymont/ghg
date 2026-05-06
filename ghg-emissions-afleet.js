@@ -30,6 +30,7 @@ var OVERRIDE_KEY = "ghg_afleet_vehicle_fuels_v07";
 var IGNITION_DIAGNOSTIC_ID = "DiagnosticIgnitionId";
 var FIXED_IGNITION_BATCH_SIZE = 50;
 var FIXED_WINDOW_BATCH_SIZE = 16;
+var IGNITION_STATUSDATA_CAP = 1000;
 var fuelTypes = [
   "Gasoline",
   "Diesel",
@@ -597,6 +598,47 @@ function buildIgnitionGroups() {
   for (i = 0; i < keys.length; i++) arr.push(map[keys[i]]);
   return arr;
 }
+function buildIgnitionGroupFromCandidates(deviceId, candidates, keyBase) {
+  var i;
+  var from = null;
+  var to = null;
+  for (i = 0; i < candidates.length; i++) {
+    var cFrom = new Date(new Date(candidates[i].start).getTime() - 120000);
+    var cTo = new Date(candidates[i].stop);
+    if (!from || cFrom.getTime() < from.getTime()) from = cFrom;
+    if (!to || cTo.getTime() > to.getTime()) to = cTo;
+  }
+  return {
+    key:
+      (keyBase || deviceId) +
+      "|split|" +
+      (from ? from.getTime() : 0) +
+      "|" +
+      (to ? to.getTime() : 0) +
+      "|" +
+      candidates.length,
+    deviceId: deviceId,
+    from: from || new Date(),
+    to: to || new Date(),
+    candidates: candidates,
+    rows: [],
+  };
+}
+function splitIgnitionGroupByCandidates(group) {
+  var list = (group.candidates || []).slice();
+  if (list.length < 2) return [group];
+  list.sort(function (a, b) {
+    return new Date(a.start).getTime() - new Date(b.start).getTime();
+  });
+  var mid = Math.floor(list.length / 2);
+  if (mid < 1 || mid >= list.length) return [group];
+  var left = list.slice(0, mid);
+  var right = list.slice(mid);
+  return [
+    buildIgnitionGroupFromCandidates(group.deviceId, left, group.key),
+    buildIgnitionGroupFromCandidates(group.deviceId, right, group.key),
+  ];
+}
 function ignitionWindowReq(g) {
   return [
     "Get",
@@ -608,7 +650,7 @@ function ignitionWindowReq(g) {
         fromDate: g.from.toISOString(),
         toDate: g.to.toISOString(),
       },
-      resultsLimit: 5000,
+      resultsLimit: IGNITION_STATUSDATA_CAP,
       propertySelector: {
         fields: ["device", "diagnostic", "dateTime", "data"],
         isIncluded: true,
@@ -763,11 +805,39 @@ function loadIgnitionGroups(
       completed = true;
       clearTimeout(timer);
       var j;
+      var retry = [];
       for (j = 0; j < results.length; j++) {
         _ignWindowCalls += 1;
-        batch[j].rows = results[j] || [];
+        var rows = results[j] || [];
+        if (
+          rows.length >= IGNITION_STATUSDATA_CAP &&
+          (batch[j].candidates || []).length > 1
+        ) {
+          var splitGroups = splitIgnitionGroupByCandidates(batch[j]);
+          if (splitGroups.length > 1) {
+            _splitCount += 1;
+            retry = retry.concat(splitGroups);
+            if (_debugData.cappedWindows.length < 200) {
+              _debugData.cappedWindows.push({
+                kind: "ignition",
+                from: batch[j].from.toISOString(),
+                to: batch[j].to.toISOString(),
+                count: rows.length,
+                candidates: batch[j].candidates.length,
+              });
+            }
+            continue;
+          }
+        }
+        batch[j].rows = rows;
         recordIgnitionWindowSample(batch[j]);
         evaluateIgnitionGroup(batch[j]);
+      }
+      if (retry.length > 0) {
+        groups = groups
+          .slice(0, index + batch.length)
+          .concat(retry)
+          .concat(groups.slice(index + batch.length));
       }
       var elapsed = new Date().getTime() - callStarted;
       var nextBatchSize = batchSize;
@@ -1459,7 +1529,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.6";
+  var version = "1.7";
   var lines = [];
   lines.push(
     csvRow([
@@ -1531,7 +1601,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.6.csv";
+  a.download = "ghg-emissions-afleet-v1.7.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1570,4 +1640,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.6 registered");
+console.log("GHG Emissions AFLEET v1.7 registered");
