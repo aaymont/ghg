@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>GHG Emissions AFLEET v1.4</title>
+    <title>GHG Emissions AFLEET v1.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=1.4" />
+    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=1.5" />
   </head>
   <body>
     <div style="max-width: 1280px; margin: 0 auto">
@@ -21,7 +21,7 @@
           Vehicle GHG Emissions by Powertrain and Fuel Type
         </h1>
         <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px">
-          Version 1.4
+          Version 1.5
         </div>
         <div style="color: #4b5563; line-height: 1.5">
           v0.10 calculates driving and idling GHG emissions by fuel type.
@@ -132,6 +132,78 @@
             <option value="3">3-day</option>
             <option value="7">Weekly</option>
           </select>
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 150px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >WINDOW MULTICALL</label
+          ><input
+            id="windowCallBatchSize"
+            type="number"
+            value="16"
+            min="1"
+            max="50"
+            step="1"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
+        </div>
+        <div
+          style="
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            min-width: 150px;
+          "
+        >
+          <label
+            style="
+              display: block;
+              font-size: 12px;
+              font-weight: bold;
+              color: #6b7280;
+              margin-bottom: 6px;
+            "
+            >IGNITION MULTICALL</label
+          ><input
+            id="ignitionCallBatchSize"
+            type="number"
+            value="10"
+            min="1"
+            max="50"
+            step="1"
+            style="
+              width: 100%;
+              box-sizing: border-box;
+              padding: 10px;
+              border: 1px solid #d1d5db;
+              border-radius: 8px;
+              font-size: 14px;
+            "
+          />
         </div>
         <div
           style="
@@ -711,6 +783,6 @@
         "
       ></pre>
     </div>
-    <script src="ghg-emissions-afleet.js?v=1.4"></script>
+    <script src="ghg-emissions-afleet.js?v=1.5"></script>
   </body>
 </html>

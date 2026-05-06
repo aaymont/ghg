@@ -133,6 +133,13 @@ function displayGhgFromKg(kg) {
 function displayDistanceFromMiles(mi) {
   return getUnitMode() === "metric" ? mi / 0.621371 : mi;
 }
+function clampInt(value, fallback, min, max) {
+  var n = parseInt(value, 10);
+  if (isNaN(n)) n = fallback;
+  if (typeof min === "number" && n < min) n = min;
+  if (typeof max === "number" && n > max) n = max;
+  return n;
+}
 function getFactors() {
   var saved = getSavedJson(FACTOR_KEY, null);
   var factors = {};
@@ -672,6 +679,7 @@ function loadIgnitionGroups(
   groups,
   index,
   batchSize,
+  maxBatchSize,
   token,
   onDone,
   onError,
@@ -681,6 +689,8 @@ function loadIgnitionGroups(
     onDone();
     return;
   }
+  maxBatchSize = clampInt(maxBatchSize, batchSize, 1, 50);
+  batchSize = clampInt(batchSize, 1, 1, maxBatchSize);
   if (batchSize < 1) batchSize = 1;
   var batch = groups.slice(index, index + batchSize);
   var calls = [];
@@ -693,6 +703,9 @@ function loadIgnitionGroups(
       (index + batch.length) +
       " of " +
       groups.length +
+      " (batch " +
+      batchSize +
+      ")" +
       "... checked " +
       _ignChecked +
       " of " +
@@ -702,6 +715,7 @@ function loadIgnitionGroups(
   );
   var completed = false;
   var timeoutMs = batchSize > 1 ? 45000 : 30000;
+  var callStarted = new Date().getTime();
   var timer = setTimeout(function () {
     if (completed || token !== _runToken) return;
     completed = true;
@@ -719,6 +733,7 @@ function loadIgnitionGroups(
         groups,
         index,
         Math.max(1, Math.floor(batchSize / 2)),
+        maxBatchSize,
         token,
         onDone,
         onError,
@@ -728,7 +743,16 @@ function loadIgnitionGroups(
       markIgnitionGroupNoData(batch[0], "StatusData timeout");
       calculateAndRender();
       setTimeout(function () {
-        loadIgnitionGroups(api, groups, index + 1, 1, token, onDone, onError);
+        loadIgnitionGroups(
+          api,
+          groups,
+          index + 1,
+          1,
+          maxBatchSize,
+          token,
+          onDone,
+          onError,
+        );
       }, 0);
     }
   }, timeoutMs);
@@ -745,13 +769,23 @@ function loadIgnitionGroups(
         recordIgnitionWindowSample(batch[j]);
         evaluateIgnitionGroup(batch[j]);
       }
+      var elapsed = new Date().getTime() - callStarted;
+      var nextBatchSize = batchSize;
+      if (
+        batch.length === batchSize &&
+        batchSize < maxBatchSize &&
+        elapsed < 8000
+      ) {
+        nextBatchSize = Math.min(maxBatchSize, batchSize + 1);
+      }
       calculateAndRender();
       setTimeout(function () {
         loadIgnitionGroups(
           api,
           groups,
           index + batch.length,
-          batchSize,
+          nextBatchSize,
+          maxBatchSize,
           token,
           onDone,
           onError,
@@ -776,6 +810,7 @@ function loadIgnitionGroups(
           groups,
           index,
           Math.max(1, Math.floor(batchSize / 2)),
+          maxBatchSize,
           token,
           onDone,
           onError,
@@ -788,7 +823,16 @@ function loadIgnitionGroups(
         );
         calculateAndRender();
         setTimeout(function () {
-          loadIgnitionGroups(api, groups, index + 1, 1, token, onDone, onError);
+          loadIgnitionGroups(
+            api,
+            groups,
+            index + 1,
+            1,
+            maxBatchSize,
+            token,
+            onDone,
+            onError,
+          );
         }, 0);
       }
     },
@@ -852,6 +896,7 @@ function loadWindows(
   windows,
   index,
   batchSize,
+  maxBatchSize,
   token,
   onDone,
   onError,
@@ -861,6 +906,8 @@ function loadWindows(
     onDone();
     return;
   }
+  maxBatchSize = clampInt(maxBatchSize, batchSize, 1, 50);
+  batchSize = clampInt(batchSize, 1, 1, maxBatchSize);
   var batch = windows.slice(index, index + batchSize);
   var calls = [];
   var i;
@@ -875,9 +922,13 @@ function loadWindows(
       (index + batch.length) +
       " of " +
       windows.length +
+      " (batch " +
+      batchSize +
+      ")" +
       "...",
     false,
   );
+  var callStarted = new Date().getTime();
   api.multiCall(
     calls,
     function (results) {
@@ -932,20 +983,58 @@ function loadWindows(
           .slice(0, index + batch.length)
           .concat(retry)
           .concat(windows.slice(index + batch.length));
+      var elapsed = new Date().getTime() - callStarted;
+      var nextBatchSize = batchSize;
+      if (
+        retry.length === 0 &&
+        batch.length === batchSize &&
+        batchSize < maxBatchSize &&
+        elapsed < 4000
+      ) {
+        nextBatchSize = Math.min(maxBatchSize, batchSize + 2);
+      }
       calculateAndRender();
       loadWindows(
         api,
         kind,
         windows,
         index + batch.length,
-        batchSize,
+        nextBatchSize,
+        maxBatchSize,
         token,
         onDone,
         onError,
       );
     },
     function (err) {
-      onError(err);
+      if (token !== _runToken) return;
+      debugLog(
+        "Window load error for " +
+          kind +
+          " batches " +
+          (index + 1) +
+          "-" +
+          (index + batch.length) +
+          " at batch size " +
+          batchSize +
+          ": " +
+          (err.message || err),
+      );
+      if (batchSize > 1) {
+        loadWindows(
+          api,
+          kind,
+          windows,
+          index,
+          Math.max(1, Math.floor(batchSize / 2)),
+          maxBatchSize,
+          token,
+          onDone,
+          onError,
+        );
+      } else {
+        onError(err);
+      }
     },
   );
 }
@@ -1186,6 +1275,18 @@ function loadData(api) {
   var from = document.getElementById("fromDate").value;
   var to = document.getElementById("toDate").value;
   var days = parseInt(document.getElementById("windowDays").value, 10) || 1;
+  var tripIdleBatchSize = clampInt(
+    (document.getElementById("windowCallBatchSize") || {}).value,
+    16,
+    1,
+    50,
+  );
+  var ignitionBatchSize = clampInt(
+    (document.getElementById("ignitionCallBatchSize") || {}).value,
+    10,
+    1,
+    50,
+  );
   if (!from || !to) {
     setStatus("Please select a from date and to date.", true);
     return;
@@ -1217,6 +1318,10 @@ function loadData(api) {
       maxIdleHours: document.getElementById("maxIdleHours").value,
       ignitionDiagnosticId: document.getElementById("ignDiag").value,
     },
+    multicallSettings: {
+      tripIdleBatchSize: tripIdleBatchSize,
+      ignitionBatchSize: ignitionBatchSize,
+    },
     unitMode: getUnitMode(),
     tripWindowSamples: [],
     idleWindowSamples: [],
@@ -1246,7 +1351,8 @@ function loadData(api) {
         "trip",
         windows,
         0,
-        8,
+        tripIdleBatchSize,
+        tripIdleBatchSize,
         token,
         function () {
           loadWindows(
@@ -1254,7 +1360,8 @@ function loadData(api) {
             "idle",
             windows,
             0,
-            8,
+            tripIdleBatchSize,
+            tripIdleBatchSize,
             token,
             function () {
               if (totalHours(_ruleIdleAgg) > 0) {
@@ -1274,7 +1381,8 @@ function loadData(api) {
                   api,
                   groups,
                   0,
-                  5,
+                  ignitionBatchSize,
+                  ignitionBatchSize,
                   token,
                   function () {
                     _debugData.idleSourceUsed =
@@ -1361,7 +1469,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.4";
+  var version = "1.5";
   var lines = [];
   lines.push(
     csvRow([
@@ -1433,7 +1541,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.4.csv";
+  a.download = "ghg-emissions-afleet-v1.5.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1472,4 +1580,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.4 registered");
+console.log("GHG Emissions AFLEET v1.5 registered");
