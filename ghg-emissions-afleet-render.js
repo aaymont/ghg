@@ -254,7 +254,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "2.2";
+  var version = "2.3";
   var lines = [];
   lines.push(
     csvRow([
@@ -326,7 +326,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v2.2.csv";
+  a.download = "ghg-emissions-afleet-v2.3.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
