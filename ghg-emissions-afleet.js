@@ -25,6 +25,18 @@ var _chart = null;
 var _distanceChart = null;
 var _runToken = 0;
 var _isProcessing = false;
+var _ignMultiCallCount = 0;
+var _ignMultiCallMsTotal = 0;
+var _ignRetryAttempts = 0;
+var _ignCappedWindowCount = 0;
+var _ignSplitGroupsAdded = 0;
+var _ignQueueInitial = 0;
+var _ignQueuePeak = 0;
+var _ignCapSeen = false;
+var _ignBeforeCapWindows = 0;
+var _ignBeforeCapMs = 0;
+var _ignAfterCapWindows = 0;
+var _ignAfterCapMs = 0;
 var _factorPanelExpanded = false;
 var FACTOR_KEY = "ghg_afleet_factors_v07";
 var OVERRIDE_KEY = "ghg_afleet_vehicle_fuels_v07";
@@ -751,6 +763,8 @@ function loadIgnitionGroups(
     onDone();
     return;
   }
+  if (_ignQueueInitial < 1) _ignQueueInitial = groups.length;
+  if (groups.length > _ignQueuePeak) _ignQueuePeak = groups.length;
   maxBatchSize = FIXED_IGNITION_BATCH_SIZE;
   batchSize = FIXED_IGNITION_BATCH_SIZE;
   var batch = groups.slice(index, index + batchSize);
@@ -788,10 +802,15 @@ function loadIgnitionGroups(
       " of " +
       groups.length +
       " at size " +
-      batchSize,
+      batchSize +
+      " | capped " +
+      _ignCappedWindowCount +
+      " | retries " +
+      _ignRetryAttempts,
   );
   var completed = false;
   var timeoutMs = batchSize > 1 ? 45000 : 30000;
+  var callStarted = new Date().getTime();
   var timer = setTimeout(function () {
     if (completed || token !== _runToken) return;
     completed = true;
@@ -806,6 +825,7 @@ function loadIgnitionGroups(
     var hasRetryable = false;
     for (var r = 0; r < batch.length; r++) {
       batch[r]._retryCount = (batch[r]._retryCount || 0) + 1;
+      _ignRetryAttempts += 1;
       if (batch[r]._retryCount <= IGNITION_BATCH_RETRY_LIMIT) hasRetryable = true;
     }
     if (hasRetryable) {
@@ -849,6 +869,7 @@ function loadIgnitionGroups(
       clearTimeout(timer);
       var j;
       var retry = [];
+      var hadCapInThisCall = false;
       for (j = 0; j < results.length; j++) {
         _ignWindowCalls += 1;
         var rows = results[j] || [];
@@ -859,6 +880,9 @@ function loadIgnitionGroups(
           var splitGroups = splitIgnitionGroupByCandidates(batch[j]);
           if (splitGroups.length > 1) {
             _splitCount += 1;
+            hadCapInThisCall = true;
+            _ignCappedWindowCount += 1;
+            _ignSplitGroupsAdded += splitGroups.length;
             retry = retry.concat(splitGroups);
             if (_debugData.cappedWindows.length < 200) {
               _debugData.cappedWindows.push({
@@ -881,6 +905,31 @@ function loadIgnitionGroups(
           .slice(0, index + batch.length)
           .concat(retry)
           .concat(groups.slice(index + batch.length));
+        if (groups.length > _ignQueuePeak) _ignQueuePeak = groups.length;
+      }
+      var elapsed = new Date().getTime() - callStarted;
+      _ignMultiCallCount += 1;
+      _ignMultiCallMsTotal += elapsed;
+      if (hadCapInThisCall && !_ignCapSeen) _ignCapSeen = true;
+      if (_ignCapSeen) {
+        _ignAfterCapWindows += batch.length;
+        _ignAfterCapMs += elapsed;
+      } else {
+        _ignBeforeCapWindows += batch.length;
+        _ignBeforeCapMs += elapsed;
+      }
+      if (_debugData.ignitionTelemetry) {
+        _debugData.ignitionTelemetry.multicalls = _ignMultiCallCount;
+        _debugData.ignitionTelemetry.multicallMsTotal = _ignMultiCallMsTotal;
+        _debugData.ignitionTelemetry.avgMulticallMs =
+          _ignMultiCallCount > 0
+            ? Math.round(_ignMultiCallMsTotal / _ignMultiCallCount)
+            : 0;
+        _debugData.ignitionTelemetry.retryAttempts = _ignRetryAttempts;
+        _debugData.ignitionTelemetry.cappedWindowCount = _ignCappedWindowCount;
+        _debugData.ignitionTelemetry.splitGroupsAdded = _ignSplitGroupsAdded;
+        _debugData.ignitionTelemetry.queueInitial = _ignQueueInitial;
+        _debugData.ignitionTelemetry.queuePeak = _ignQueuePeak;
       }
       calculateAndRender();
       setTimeout(function () {
@@ -911,6 +960,7 @@ function loadIgnitionGroups(
       var hasRetryable = false;
       for (var r = 0; r < batch.length; r++) {
         batch[r]._retryCount = (batch[r]._retryCount || 0) + 1;
+        _ignRetryAttempts += 1;
         if (batch[r]._retryCount <= IGNITION_BATCH_RETRY_LIMIT)
           hasRetryable = true;
       }
@@ -1432,6 +1482,18 @@ function loadData(api) {
   _idleCalls = 0;
   _ignWindowCalls = 0;
   _splitCount = 0;
+  _ignMultiCallCount = 0;
+  _ignMultiCallMsTotal = 0;
+  _ignRetryAttempts = 0;
+  _ignCappedWindowCount = 0;
+  _ignSplitGroupsAdded = 0;
+  _ignQueueInitial = 0;
+  _ignQueuePeak = 0;
+  _ignCapSeen = false;
+  _ignBeforeCapWindows = 0;
+  _ignBeforeCapMs = 0;
+  _ignAfterCapWindows = 0;
+  _ignAfterCapMs = 0;
   _debugData = {
     dateRange: { fromDate: from, toDate: to },
     idleFallbackSettings: {
@@ -1449,6 +1511,18 @@ function loadData(api) {
     idleWindowSamples: [],
     ignitionWindowSamples: [],
     cappedWindows: [],
+    ignitionTelemetry: {
+      multicalls: 0,
+      multicallMsTotal: 0,
+      avgMulticallMs: 0,
+      retryAttempts: 0,
+      cappedWindowCount: 0,
+      splitGroupsAdded: 0,
+      queueInitial: 0,
+      queuePeak: 0,
+      beforeCapWindowsPerMinute: 0,
+      afterCapWindowsPerMinute: 0,
+    },
     note: "v0.7 groups idle candidates by device/day, queries ignition StatusData by grouped windows, then evaluates every candidate locally. This avoids one StatusData API call per candidate and exposes checked/candidate counts.",
   };
   setStatus("Loading devices and groups...", false);
@@ -1558,6 +1632,25 @@ function loadData(api) {
     _debugData.idleCalls = _idleCalls;
     _debugData.ignitionWindowCalls = _ignWindowCalls;
     _debugData.splitCount = _splitCount;
+    _debugData.ignitionTelemetry.multicalls = _ignMultiCallCount;
+    _debugData.ignitionTelemetry.multicallMsTotal = _ignMultiCallMsTotal;
+    _debugData.ignitionTelemetry.avgMulticallMs =
+      _ignMultiCallCount > 0
+        ? Math.round(_ignMultiCallMsTotal / _ignMultiCallCount)
+        : 0;
+    _debugData.ignitionTelemetry.retryAttempts = _ignRetryAttempts;
+    _debugData.ignitionTelemetry.cappedWindowCount = _ignCappedWindowCount;
+    _debugData.ignitionTelemetry.splitGroupsAdded = _ignSplitGroupsAdded;
+    _debugData.ignitionTelemetry.queueInitial = _ignQueueInitial;
+    _debugData.ignitionTelemetry.queuePeak = _ignQueuePeak;
+    _debugData.ignitionTelemetry.beforeCapWindowsPerMinute =
+      _ignBeforeCapMs > 0
+        ? Math.round((_ignBeforeCapWindows * 60000) / _ignBeforeCapMs)
+        : 0;
+    _debugData.ignitionTelemetry.afterCapWindowsPerMinute =
+      _ignAfterCapMs > 0
+        ? Math.round((_ignAfterCapWindows * 60000) / _ignAfterCapMs)
+        : 0;
     updateProcessingProgress(100, "Finalizing results", "Rendering tables and charts");
     setProcessingUi(false);
     calculateAndRender(true);
@@ -1601,7 +1694,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "2.0";
+  var version = "2.1";
   var lines = [];
   lines.push(
     csvRow([
@@ -1673,7 +1766,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v2.0.csv";
+  a.download = "ghg-emissions-afleet-v2.1.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1712,4 +1805,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v2.0 registered");
+console.log("GHG Emissions AFLEET v2.1 registered");
