@@ -28,9 +28,10 @@ var _factorPanelExpanded = false;
 var FACTOR_KEY = "ghg_afleet_factors_v07";
 var OVERRIDE_KEY = "ghg_afleet_vehicle_fuels_v07";
 var IGNITION_DIAGNOSTIC_ID = "DiagnosticIgnitionId";
-var FIXED_IGNITION_BATCH_SIZE = 25;
+var FIXED_IGNITION_BATCH_SIZE = 20;
 var FIXED_WINDOW_BATCH_SIZE = 16;
 var IGNITION_STATUSDATA_CAP = 1000;
+var IGNITION_BATCH_RETRY_LIMIT = 2;
 var fuelTypes = [
   "Gasoline",
   "Diesel",
@@ -731,9 +732,8 @@ function loadIgnitionGroups(
     onDone();
     return;
   }
-  maxBatchSize = clampInt(maxBatchSize, batchSize, 1, 50);
-  batchSize = clampInt(batchSize, 1, 1, maxBatchSize);
-  if (batchSize < 1) batchSize = 1;
+  maxBatchSize = FIXED_IGNITION_BATCH_SIZE;
+  batchSize = FIXED_IGNITION_BATCH_SIZE;
   var batch = groups.slice(index, index + batchSize);
   var calls = [];
   var i;
@@ -768,34 +768,43 @@ function loadIgnitionGroups(
         " with batch size " +
         batchSize,
     );
-    if (batchSize > 1) {
-      loadIgnitionGroups(
-        api,
-        groups,
-        index,
-        Math.max(1, Math.floor(batchSize / 2)),
-        maxBatchSize,
-        token,
-        onDone,
-        onError,
-      );
-    } else {
-      _ignTimeouts += 1;
-      markIgnitionGroupNoData(batch[0], "StatusData timeout");
-      calculateAndRender();
+    var hasRetryable = false;
+    for (var r = 0; r < batch.length; r++) {
+      batch[r]._retryCount = (batch[r]._retryCount || 0) + 1;
+      if (batch[r]._retryCount <= IGNITION_BATCH_RETRY_LIMIT) hasRetryable = true;
+    }
+    if (hasRetryable) {
       setTimeout(function () {
         loadIgnitionGroups(
           api,
           groups,
-          index + 1,
-          1,
+          index,
+          batchSize,
           maxBatchSize,
           token,
           onDone,
           onError,
         );
-      }, 0);
+      }, 1500);
+      return;
     }
+    _ignTimeouts += batch.length;
+    for (var t = 0; t < batch.length; t++) {
+      markIgnitionGroupNoData(batch[t], "StatusData timeout");
+    }
+    calculateAndRender();
+    setTimeout(function () {
+      loadIgnitionGroups(
+        api,
+        groups,
+        index + batch.length,
+        batchSize,
+        maxBatchSize,
+        token,
+        onDone,
+        onError,
+      );
+    }, 0);
   }, timeoutMs);
   api.multiCall(
     calls,
@@ -864,37 +873,47 @@ function loadIgnitionGroups(
           ": " +
           (err.message || err),
       );
-      if (batchSize > 1) {
-        loadIgnitionGroups(
-          api,
-          groups,
-          index,
-          Math.max(1, Math.floor(batchSize / 2)),
-          maxBatchSize,
-          token,
-          onDone,
-          onError,
-        );
-      } else {
-        _ignErrors += 1;
-        markIgnitionGroupNoData(
-          batch[0],
-          "StatusData error: " + (err.message || err),
-        );
-        calculateAndRender();
+      var hasRetryable = false;
+      for (var r = 0; r < batch.length; r++) {
+        batch[r]._retryCount = (batch[r]._retryCount || 0) + 1;
+        if (batch[r]._retryCount <= IGNITION_BATCH_RETRY_LIMIT)
+          hasRetryable = true;
+      }
+      if (hasRetryable) {
         setTimeout(function () {
           loadIgnitionGroups(
             api,
             groups,
-            index + 1,
-            1,
+            index,
+            batchSize,
             maxBatchSize,
             token,
             onDone,
             onError,
           );
-        }, 0);
+        }, 1500);
+        return;
       }
+      _ignErrors += batch.length;
+      for (var eIx = 0; eIx < batch.length; eIx++) {
+        markIgnitionGroupNoData(
+          batch[eIx],
+          "StatusData error: " + (err.message || err),
+        );
+      }
+      calculateAndRender();
+      setTimeout(function () {
+        loadIgnitionGroups(
+          api,
+          groups,
+          index + batch.length,
+          batchSize,
+          maxBatchSize,
+          token,
+          onDone,
+          onError,
+        );
+      }, 0);
     },
   );
 }
@@ -1519,7 +1538,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.8";
+  var version = "1.9";
   var lines = [];
   lines.push(
     csvRow([
@@ -1591,7 +1610,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.8.csv";
+  a.download = "ghg-emissions-afleet-v1.9.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1630,4 +1649,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.8 registered");
+console.log("GHG Emissions AFLEET v1.9 registered");
