@@ -178,6 +178,53 @@ function groupName(id) {
   var g = _groupMap[id];
   return g ? g.name || g.id : id;
 }
+function getParentGroupId(group) {
+  if (!group) return null;
+  if (group.parent && typeof group.parent === "object" && group.parent.id)
+    return group.parent.id;
+  if (typeof group.parent === "string") return group.parent;
+  if (
+    group.parentGroup &&
+    typeof group.parentGroup === "object" &&
+    group.parentGroup.id
+  )
+    return group.parentGroup.id;
+  if (typeof group.parentGroup === "string") return group.parentGroup;
+  return null;
+}
+function normalizeGroupLabel(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function getGroupPathToRoot(groupId) {
+  var path = [];
+  var seen = {};
+  var currentId = groupId;
+  while (currentId && !seen[currentId]) {
+    seen[currentId] = true;
+    var grp = _groupMap[currentId];
+    if (!grp) break;
+    path.push(grp);
+    currentId = getParentGroupId(grp);
+  }
+  return path;
+}
+function hasPowertrainFuelPath(pathNames) {
+  var assetIx = -1;
+  var powertrainIx = -1;
+  var i;
+  for (i = 0; i < pathNames.length; i++) {
+    if (assetIx === -1 && pathNames[i] === "asset information") assetIx = i;
+    if (
+      powertrainIx === -1 &&
+      pathNames[i] === "powertrain and fuel type"
+    )
+      powertrainIx = i;
+  }
+  return assetIx > -1 && powertrainIx > assetIx;
+}
 function normFuel(text) {
   var s = String(text || "").toLowerCase();
   if (s.indexOf("lng") > -1 && s.indexOf("pilot") > -1)
@@ -221,22 +268,30 @@ function classifyFuel(device) {
   var i;
   for (i = 0; i < groups.length; i++) {
     var id = groups[i].id || "";
+    var pathLeafToRoot = getGroupPathToRoot(id);
+    var pathRootToLeaf = pathLeafToRoot.slice().reverse();
+    var pathNames = [];
+    var j;
+    for (j = 0; j < pathRootToLeaf.length; j++) {
+      pathNames.push(pathRootToLeaf[j].name || pathRootToLeaf[j].id || "");
+    }
+    var normalizedPathNames = [];
+    for (j = 0; j < pathNames.length; j++) {
+      normalizedPathNames.push(normalizeGroupLabel(pathNames[j]));
+    }
+    var inPowertrainTree = hasPowertrainFuelPath(normalizedPathNames);
     var nm = groupName(id);
-    var combined = id + " " + nm;
+    var combined = id + " " + pathNames.join(" > ");
     var f = normFuel(combined);
     if (f) {
-      var low = combined.toLowerCase();
       var score = 1;
-      if (
-        low.indexOf("powertrain") > -1 ||
-        low.indexOf("fuel type") > -1 ||
-        low.indexOf("asset information") > -1
-      )
-        score = 3;
-      if (id.indexOf("Group") === 0) score = 2;
+      if (inPowertrainTree) score = 100 + pathNames.length;
+      else if (id.indexOf("Group") === 0) score = 2;
       if (!best || score > best.score) {
         best = { fuel: f, score: score };
-        src = nm + " (" + id + ")";
+        src = inPowertrainTree
+          ? pathNames.join(" > ")
+          : nm + " (" + id + ")";
       }
     }
   }
@@ -1253,7 +1308,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.2";
+  var version = "1.3";
   var lines = [];
   lines.push(
     csvRow([
@@ -1325,7 +1380,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.2.csv";
+  a.download = "ghg-emissions-afleet-v1.3.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1364,4 +1419,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.2 registered");
+console.log("GHG Emissions AFLEET v1.3 registered");
