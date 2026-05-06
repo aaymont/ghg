@@ -24,6 +24,7 @@ var _splitCount = 0;
 var _chart = null;
 var _distanceChart = null;
 var _runToken = 0;
+var _isProcessing = false;
 var _factorPanelExpanded = false;
 var FACTOR_KEY = "ghg_afleet_factors_v07";
 var OVERRIDE_KEY = "ghg_afleet_vehicle_fuels_v07";
@@ -100,6 +101,24 @@ function setStatus(msg, isError) {
   el.style.borderColor = isError ? "#fecaca" : "#bfdbfe";
   el.style.color = isError ? "#991b1b" : "#1e40af";
   el.textContent = msg;
+}
+function setProcessingUi(active) {
+  _isProcessing = !!active;
+  var panel = document.getElementById("processingPanel");
+  var results = document.getElementById("resultsContent");
+  if (panel) panel.style.display = active ? "block" : "none";
+  if (results) results.style.display = active ? "none" : "block";
+}
+function updateProcessingProgress(percent, title, detail) {
+  var p = Math.max(0, Math.min(100, Math.round(percent || 0)));
+  var bar = document.getElementById("processingBar");
+  var pct = document.getElementById("processingPercent");
+  var ttl = document.getElementById("processingTitle");
+  var dtl = document.getElementById("processingDetail");
+  if (bar) bar.style.width = p + "%";
+  if (pct) pct.textContent = p + "%";
+  if (ttl) ttl.textContent = title || "Processing data...";
+  if (dtl) dtl.textContent = detail || "";
 }
 function nfmt(n, d) {
   if (n === null || typeof n === "undefined" || isNaN(n)) return "--";
@@ -755,6 +774,22 @@ function loadIgnitionGroups(
       " idle candidates",
     false,
   );
+  var groupProgress =
+    Math.min(groups.length, index + batch.length) / Math.max(1, groups.length);
+  var candidateProgress =
+    _candidateCount > 0 ? _ignChecked / Math.max(1, _candidateCount) : 0;
+  updateProcessingProgress(
+    68 + 32 * Math.max(groupProgress, candidateProgress),
+    "Checking ignition windows",
+    "Batches " +
+      (index + 1) +
+      "-" +
+      (index + batch.length) +
+      " of " +
+      groups.length +
+      " at size " +
+      batchSize,
+  );
   var completed = false;
   var timeoutMs = batchSize > 1 ? 45000 : 30000;
   var timer = setTimeout(function () {
@@ -1007,6 +1042,21 @@ function loadWindows(
       "...",
     false,
   );
+  updateProcessingProgress(
+    (kind === "trip" ? 8 : 40) +
+      (kind === "trip" ? 32 : 28) *
+        (Math.min(windows.length, index + batch.length) /
+          Math.max(1, windows.length)),
+    kind === "trip" ? "Loading trip windows" : "Loading idling windows",
+    "Batches " +
+      (index + 1) +
+      "-" +
+      (index + batch.length) +
+      " of " +
+      windows.length +
+      " at size " +
+      batchSize,
+  );
   var callStarted = new Date().getTime();
   api.multiCall(
     calls,
@@ -1117,7 +1167,8 @@ function loadWindows(
     },
   );
 }
-function calculateAndRender() {
+function calculateAndRender(forceRender) {
+  if (_isProcessing && !forceRender) return;
   var dm = getDeviceMap();
   var factors = getFactors();
   var useRule = totalHours(_ruleIdleAgg) > 0;
@@ -1360,6 +1411,8 @@ function loadData(api) {
     setStatus("Please select a from date and to date.", true);
     return;
   }
+  setProcessingUi(true);
+  updateProcessingProgress(2, "Preparing data...", "Resetting counters");
   _tripAgg = {};
   _ruleIdleAgg = {};
   _tripIdleAgg = {};
@@ -1399,6 +1452,7 @@ function loadData(api) {
     note: "v0.7 groups idle candidates by device/day, queries ignition StatusData by grouped windows, then evaluates every candidate locally. This avoids one StatusData API call per candidate and exposes checked/candidate counts.",
   };
   setStatus("Loading devices and groups...", false);
+  updateProcessingProgress(5, "Loading devices and groups", "Starting initial API calls");
   document.getElementById("vehicleTable").innerHTML =
     '<div style="text-align:center;padding:20px;color:#666;">Loading...</div>';
   api.multiCall(
@@ -1411,6 +1465,11 @@ function loadData(api) {
       _devices = res[0] || [];
       _groups = res[1] || [];
       buildGroupMap(_groups);
+      updateProcessingProgress(
+        8,
+        "Preparing time windows",
+        "Devices: " + _devices.length + ", Groups: " + _groups.length,
+      );
       debugSample("devices", _devices);
       debugSample("groups", _groups);
       var windows = buildWindows(from, to, days);
@@ -1473,12 +1532,14 @@ function loadData(api) {
         },
         function (err) {
           _debugData.lastError = String(err.message || err);
+          setProcessingUi(false);
           setStatus("Error loading trips: " + (err.message || err), true);
         },
       );
     },
     function (err) {
       _debugData.lastError = String(err.message || err);
+      setProcessingUi(false);
       setStatus("Error loading devices/groups: " + (err.message || err), true);
     },
   );
@@ -1497,7 +1558,9 @@ function loadData(api) {
     _debugData.idleCalls = _idleCalls;
     _debugData.ignitionWindowCalls = _ignWindowCalls;
     _debugData.splitCount = _splitCount;
-    calculateAndRender();
+    updateProcessingProgress(100, "Finalizing results", "Rendering tables and charts");
+    setProcessingUi(false);
+    calculateAndRender(true);
     setStatus(
       "Calculation complete. Trips: " +
         nfmt(_tripCount, 0) +
@@ -1538,7 +1601,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "1.9";
+  var version = "2.0";
   var lines = [];
   lines.push(
     csvRow([
@@ -1610,7 +1673,7 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v1.9.csv";
+  a.download = "ghg-emissions-afleet-v2.0.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1649,4 +1712,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
     },
   };
 };
-console.log("GHG Emissions AFLEET v1.9 registered");
+console.log("GHG Emissions AFLEET v2.0 registered");
