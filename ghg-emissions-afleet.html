@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>GHG Emissions AFLEET v2.3</title>
+    <title>GHG Emissions AFLEET v2.4</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=2.3" />
+    <link rel="stylesheet" href="ghg-emissions-afleet.css?v=2.4" />
   </head>
   <body>
     <div style="max-width: 1280px; margin: 0 auto">
@@ -17,11 +17,27 @@
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         "
       >
-        <h1 style="margin: 0 0 8px 0; font-size: 26px; color: #111827">
-          Vehicle GHG Emissions by Powertrain and Fuel Type
-        </h1>
-        <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px">
-          Version 2.3
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+          "
+        >
+          <div>
+            <h1 style="margin: 0 0 8px 0; font-size: 26px; color: #111827">
+              Vehicle GHG Emissions by Powertrain and Fuel Type
+            </h1>
+            <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px">
+              Version 2.4
+            </div>
+          </div>
+          <img
+            src="../gf30px.png"
+            alt="GoFleet logo"
+            style="height: 30px; width: auto; object-fit: contain; margin-top: 2px"
+          />
         </div>
       </div>
       <div
@@ -560,20 +576,68 @@
             min-width: 320px;
           "
         >
-          <h2 style="margin: 0 0 10px 0; font-size: 18px">
-            Total Emissions by Fuel Subtype
-          </h2>
-          <canvas
-            id="fuelChart"
-            style="width: 100%; max-height: 320px"
-          ></canvas>
-          <h2 style="margin: 20px 0 10px 0; font-size: 18px">
-            Distance by Fuel Subtype
-          </h2>
-          <canvas
-            id="distanceChart"
-            style="width: 100%; max-height: 320px"
-          ></canvas>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              margin-bottom: 12px;
+              flex-wrap: wrap;
+            "
+          >
+            <h2 id="chartTabTitle" style="margin: 0; font-size: 18px">
+              Distance by Fuel Subtype
+            </h2>
+            <div style="display: flex; gap: 8px">
+              <button
+                id="tabDistanceBtn"
+                type="button"
+                onclick="setChartTab('distance')"
+                style="
+                  background: #2563eb;
+                  color: white;
+                  border: none;
+                  border-radius: 8px;
+                  padding: 6px 10px;
+                  cursor: pointer;
+                  font-size: 12px;
+                  font-weight: bold;
+                "
+              >
+                Distance
+              </button>
+              <button
+                id="tabEmissionsBtn"
+                type="button"
+                onclick="setChartTab('emissions')"
+                style="
+                  background: #e5e7eb;
+                  color: #374151;
+                  border: none;
+                  border-radius: 8px;
+                  padding: 6px 10px;
+                  cursor: pointer;
+                  font-size: 12px;
+                  font-weight: bold;
+                "
+              >
+                Emissions
+              </button>
+            </div>
+          </div>
+          <div id="distanceChartPanel">
+            <canvas
+              id="distanceChart"
+              style="width: 100%; max-height: 320px"
+            ></canvas>
+          </div>
+          <div id="fuelChartPanel" style="display: none">
+            <canvas
+              id="fuelChart"
+              style="width: 100%; max-height: 320px"
+            ></canvas>
+          </div>
         </div>
         <div
           style="
@@ -720,8 +784,8 @@
         "
       ></pre>
     </div>
-    <script src="ghg-emissions-afleet-render.js?v=2.3"></script>
-    <script src="ghg-emissions-afleet.js?v=2.3"></script>
-    <script src="ghg-emissions-afleet-bootstrap.js?v=2.3"></script>
+    <script src="ghg-emissions-afleet-render.js?v=2.4"></script>
+    <script src="ghg-emissions-afleet.js?v=2.4"></script>
+    <script src="ghg-emissions-afleet-bootstrap.js?v=2.4"></script>
   </body>
 </html>

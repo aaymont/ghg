@@ -32,4 +32,4 @@ geotab.addin["ghg-emissions-afleet-v012"] = function () {
   };
 };
 
-console.log("GHG Emissions AFLEET v2.3 registered");
+console.log("GHG Emissions AFLEET v2.4 registered");

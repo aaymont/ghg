@@ -232,6 +232,30 @@ function renderChart() {
       scales: { y: { beginAtZero: true } },
     },
   });
+  setChartTab(_activeChartTab || "distance");
+}
+var _activeChartTab = "distance";
+
+function setChartTab(tabName) {
+  var tab = tabName === "emissions" ? "emissions" : "distance";
+  _activeChartTab = tab;
+  var distancePanel = document.getElementById("distanceChartPanel");
+  var fuelPanel = document.getElementById("fuelChartPanel");
+  var distanceBtn = document.getElementById("tabDistanceBtn");
+  var emissionsBtn = document.getElementById("tabEmissionsBtn");
+  var title = document.getElementById("chartTabTitle");
+  if (!distancePanel || !fuelPanel || !distanceBtn || !emissionsBtn || !title)
+    return;
+  var showDistance = tab === "distance";
+  distancePanel.style.display = showDistance ? "block" : "none";
+  fuelPanel.style.display = showDistance ? "none" : "block";
+  distanceBtn.style.background = showDistance ? "#2563eb" : "#e5e7eb";
+  distanceBtn.style.color = showDistance ? "white" : "#374151";
+  emissionsBtn.style.background = showDistance ? "#e5e7eb" : "#2563eb";
+  emissionsBtn.style.color = showDistance ? "#374151" : "white";
+  title.textContent = showDistance
+    ? "Distance by Fuel Subtype"
+    : "Total Emissions by Fuel Subtype";
 }
 
 function csvCell(value) {
@@ -254,7 +278,7 @@ function downloadCsv() {
   var fromDate = (document.getElementById("fromDate") || {}).value || "";
   var toDate = (document.getElementById("toDate") || {}).value || "";
   var unitMode = getUnitMode();
-  var version = "2.3";
+  var version = "2.4";
   var lines = [];
   lines.push(
     csvRow([
@@ -326,9 +350,11 @@ function downloadCsv() {
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = "ghg-emissions-afleet-v2.3.csv";
+  a.download = "ghg-emissions-afleet-v2.4.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+setChartTab("distance");
